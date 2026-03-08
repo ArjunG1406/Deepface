@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+websockets
+fer
+opencv-python-headless
+tensorflow
+python-multipart
