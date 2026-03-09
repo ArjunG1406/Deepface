@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
 websockets
-fer
+deepface
 opencv-python-headless
-tensorflow
+tensorflow==2.20.0
+tf-keras
 python-multipart
