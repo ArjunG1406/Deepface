@@ -199,7 +199,7 @@ async function start() {
   setStatus('', 'Connecting...');
 
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const wsUrl = isLocal ? 'ws://127.0.0.1:8000/ws' : 'wss://deepface-production-602c.up.railway.app/ws';
+  const wsUrl = isLocal ? 'ws://127.0.0.1:8000/ws' : 'wss://deepface-wao8.onrender.com/ws';
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
