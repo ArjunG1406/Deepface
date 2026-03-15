@@ -122,7 +122,7 @@
     <div class="panel">
       <div class="panel-title">// Server</div>
       <span class="config-label">WebSocket URL</span>
-      <input id="wsUrl" type="text" value="ws://localhost:8000/ws" />
+      <input id="wsUrl" type="text" value="wss://deepface-wao8.onrender.com/ws" />
     </div>
 
     <div class="panel">
@@ -198,7 +198,10 @@ async function start() {
   canvasWrapper.classList.add('live');
   setStatus('', 'Connecting...');
 
-  ws = new WebSocket(wsUrlInput.value.trim());
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const wsUrl = isLocal ? 'ws://127.0.0.1:8000/ws' : 'wss://deepface-wao8.onrender.com/ws';
+  ws = new WebSocket(wsUrl);
+
   ws.onopen = () => {
     running = true;
     frameCount = 0; fpsFrames = 0;
