@@ -17,11 +17,28 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+
+@app.on_event("startup")
+async def warmup():
+    """Pre-load DeepFace models at startup so first user request is instant."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    logger.info("Pre-warming DeepFace models...")
+    dummy = np.zeros((100, 100, 3), dtype=np.uint8)
+    await loop.run_in_executor(None, lambda: DeepFace.analyze(
+        dummy,
+        actions=["emotion", "age", "gender"],
+        detector_backend=DETECTOR_BACKEND,
+        enforce_detection=False,
+        silent=True
+    ))
+    logger.info("DeepFace models loaded and ready!")
+
 # Exact same settings as your original working script
-DETECTOR_BACKEND = "opencv"
-FRAME_SKIP       = 5
-MIN_FACE_SIZE    = 50
-SMOOTH_N         = 10
+DETECTOR_BACKEND = "ssd"
+FRAME_SKIP       = 3
+MIN_FACE_SIZE    = 30
+SMOOTH_N         = 5
 
 
 class Smoother:
@@ -51,7 +68,7 @@ def analyze(frame):
     try:
         results = DeepFace.analyze(
             frame,
-            actions=["emotion"],
+            actions=["emotion", "age", "gender"],
             detector_backend=DETECTOR_BACKEND,
             enforce_detection=False,
             silent=True
@@ -66,6 +83,8 @@ def analyze(frame):
                     "box":     {"x": int(r["x"]), "y": int(r["y"]), "w": int(r["w"]), "h": int(r["h"])},
                     "emotion": str(p["dominant_emotion"]),
                     "scores":  {k: float(v) for k, v in p.get("emotion", {}).items()},
+                    "age":     int(p.get("age", 0)),
+                    "gender":  str(p.get("dominant_gender", p.get("gender", "unknown"))),
                 })
         return faces
     except Exception as e:
@@ -101,6 +120,8 @@ async def ws_endpoint(websocket: WebSocket):
                     "box":     face["box"],
                     "emotion": s.update(face["emotion"]),
                     "scores":  face["scores"],
+                    "age":     face.get("age", 0),
+                    "gender":  face.get("gender", "unknown"),
                 })
             await websocket.send_json({"faces": to_python(out), "count": len(out)})
     except WebSocketDisconnect:
