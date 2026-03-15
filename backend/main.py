@@ -54,7 +54,7 @@ def analyze(frame):
     try:
         results = DeepFace.analyze(
             frame,
-            actions=["emotion", "age", "gender"],
+            actions=["emotion"],
             detector_backend=DETECTOR_BACKEND,
             enforce_detection=False,
             silent=True
@@ -69,8 +69,7 @@ def analyze(frame):
                     "box":     {"x": int(r["x"]), "y": int(r["y"]), "w": int(r["w"]), "h": int(r["h"])},
                     "emotion": str(p["dominant_emotion"]),
                     "scores":  {k: float(v) for k, v in p.get("emotion", {}).items()},
-                    "age":     int(p.get("age", 0)),
-                    "gender":  str(p.get("dominant_gender", p.get("gender", "unknown"))),
+
                 })
         return faces
     except Exception as e:
@@ -106,8 +105,7 @@ async def ws_endpoint(websocket: WebSocket):
                     "box":     face["box"],
                     "emotion": s.update(face["emotion"]),
                     "scores":  face["scores"],
-                    "age":     face.get("age", 0),
-                    "gender":  face.get("gender", "unknown"),
+
                 })
             await websocket.send_json({"faces": to_python(out), "count": len(out)})
     except WebSocketDisconnect:
