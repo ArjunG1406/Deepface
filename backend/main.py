@@ -18,21 +18,7 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
-@app.on_event("startup")
-async def warmup():
-    """Pre-load DeepFace models at startup so first user request is instant."""
-    import asyncio
-    loop = asyncio.get_event_loop()
-    logger.info("Pre-warming DeepFace models...")
-    dummy = np.zeros((100, 100, 3), dtype=np.uint8)
-    await loop.run_in_executor(None, lambda: DeepFace.analyze(
-        dummy,
-        actions=["emotion", "age", "gender"],
-        detector_backend=DETECTOR_BACKEND,
-        enforce_detection=False,
-        silent=True
-    ))
-    logger.info("DeepFace models loaded and ready!")
+
 
 # Exact same settings as your original working script
 DETECTOR_BACKEND = "ssd"
