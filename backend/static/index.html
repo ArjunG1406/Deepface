@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FaceRead — Live Emotion Detection</title>
+  <title>FaceRead — Emotion Detection</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,8 +26,17 @@
     .status-dot.error { background:var(--accent2); }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
 
-    main { position:relative; z-index:5; max-width:1200px; margin:0 auto; padding:40px; display:grid; grid-template-columns:1fr 320px; gap:28px; }
-    @media(max-width:880px){ main{grid-template-columns:1fr;padding:20px;} header{padding:16px 20px;} }
+    .tab-nav { position:relative; z-index:10; display:flex; border-bottom:1px solid var(--border); padding:0 40px; }
+    .tab-btn { font-family:'DM Mono',monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:.12em; padding:12px 22px; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--muted); cursor:pointer; transition:all .2s; margin-bottom:-1px; }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .tab-pane { display:none; }
+    .tab-pane.active { display:grid; }
+
+    main { position:relative; z-index:5; max-width:1200px; margin:0 auto; padding:40px; }
+    @media(max-width:880px){ main{padding:20px;} header{padding:16px 20px;} .tab-nav{padding:0 20px;} }
+    .two-col { grid-template-columns:1fr 320px; gap:28px; }
+    @media(max-width:880px){ .two-col{grid-template-columns:1fr;} }
 
     .video-section { display:flex; flex-direction:column; gap:14px; }
     .section-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); }
@@ -36,35 +45,33 @@
     .canvas-wrapper::before,.canvas-wrapper::after { content:''; position:absolute; width:18px; height:18px; z-index:5; pointer-events:none; }
     .canvas-wrapper::before { top:10px; left:10px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); }
     .canvas-wrapper::after  { bottom:10px; right:10px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); }
-
     #videoEl { width:100%; height:100%; object-fit:cover; display:block; transform:scaleX(-1); }
     #overlayCanvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-
     .scan-line { position:absolute; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:0; pointer-events:none; z-index:6; }
     .canvas-wrapper.live .scan-line { opacity:.4; animation:scan 3s linear infinite; }
     @keyframes scan { from{top:0%}to{top:100%} }
-
     #placeholder { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--surface); }
     #placeholder .icon { font-size:2.5rem; }
     #placeholder p { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
 
-    .controls { display:flex; gap:10px; }
+    .controls { display:flex; gap:10px; flex-wrap:wrap; }
     button { font-family:'DM Mono',monospace; font-size:0.72rem; text-transform:uppercase; letter-spacing:.1em; padding:10px 22px; border:1px solid var(--border); border-radius:3px; cursor:pointer; transition:all .2s; background:transparent; color:var(--text); }
-    #startBtn { border-color:var(--accent); color:var(--accent); }
-    #startBtn:hover { background:var(--accent); color:var(--bg); }
-    #startBtn.running { border-color:var(--accent2); color:var(--accent2); }
-    #startBtn.running:hover { background:var(--accent2); color:var(--bg); }
+    .btn-accent { border-color:var(--accent); color:var(--accent); }
+    .btn-accent:hover { background:var(--accent); color:var(--bg); }
+    .btn-accent.running { border-color:var(--accent2); color:var(--accent2); }
+    .btn-accent.running:hover { background:var(--accent2); color:var(--bg); }
+    .btn-muted { border-color:var(--border); color:var(--muted); }
+    .btn-muted:hover { border-color:var(--text); color:var(--text); }
 
     .sidebar { display:flex; flex-direction:column; gap:18px; }
     .panel { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:18px; }
     .panel-title { font-size:0.62rem; text-transform:uppercase; letter-spacing:.2em; color:var(--muted); margin-bottom:14px; }
-
     .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .stat { background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:3px; padding:10px; }
     .stat-value { font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800; color:var(--accent); line-height:1; }
     .stat-label { font-size:0.62rem; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:.1em; }
 
-    #faceList { display:flex; flex-direction:column; gap:10px; min-height:50px; }
+    .face-list { display:flex; flex-direction:column; gap:10px; min-height:50px; }
     .face-card { background:rgba(255,255,255,.03); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:3px; padding:10px 12px; }
     .face-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
     .face-id { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
@@ -78,11 +85,49 @@
     .no-faces { text-align:center; color:var(--muted); font-size:0.72rem; padding:18px 0; }
 
     .config-label { font-size:0.68rem; color:var(--muted); display:block; margin-bottom:6px; }
-    #wsUrl { font-family:'DM Mono',monospace; font-size:0.65rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:3px; outline:none; width:100%; }
-    #wsUrl:focus { border-color:var(--accent); }
+    .url-input { font-family:'DM Mono',monospace; font-size:0.65rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:3px; outline:none; width:100%; }
+    .url-input:focus { border-color:var(--accent); }
+
+    /* Upload drop zone */
+    .upload-zone { border:2px dashed var(--border); border-radius:4px; aspect-ratio:4/3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; cursor:pointer; transition:border-color .2s; position:relative; overflow:hidden; background:var(--surface); }
+    .upload-zone:hover, .upload-zone.drag { border-color:var(--accent); }
+    .upload-zone .uz-icon { font-size:2.5rem; pointer-events:none; }
+    .upload-zone .uz-text { font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; text-align:center; pointer-events:none; }
+    .upload-zone .uz-sub  { font-size:0.6rem; color:var(--muted); opacity:.5; pointer-events:none; }
+    .upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+
+    /* Result canvas wrappers */
+    .result-wrap { position:relative; display:none; aspect-ratio:4/3; background:#000; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+    .result-wrap::before { content:''; position:absolute; top:10px; left:10px; width:18px; height:18px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); z-index:5; pointer-events:none; }
+    .result-wrap::after  { content:''; position:absolute; bottom:10px; right:10px; width:18px; height:18px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); z-index:5; pointer-events:none; }
+    .result-wrap canvas, .result-wrap video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+    .result-wrap .base-layer { position:relative; z-index:1; }
+    .result-wrap .overlay-layer { position:absolute; inset:0; z-index:2; pointer-events:none; }
+
+    /* Processing overlay */
+    .proc-overlay { position:absolute; inset:0; background:rgba(5,8,16,.88); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:20; }
+    .proc-overlay.hidden { display:none; }
+    .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .proc-text { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+    .prog-wrap { width:200px; }
+    .prog-track { height:4px; background:rgba(255,255,255,.06); border-radius:2px; overflow:hidden; }
+    .prog-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .15s; }
+    .prog-pct { font-size:0.6rem; color:var(--muted); margin-top:4px; }
+
+    /* Video timeline */
+    .timeline-panel { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:14px; }
+    .timeline-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .tl-label { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:.15em; }
+    .tl-info  { font-size:0.62rem; color:var(--accent); }
+    #timelineScrubber { width:100%; accent-color:var(--accent); cursor:pointer; height:6px; }
+    .emotion-tl { display:flex; height:20px; border-radius:3px; overflow:hidden; gap:1px; margin-top:10px; }
+    .etl-seg { flex:1; min-width:2px; border-radius:1px; cursor:pointer; transition:opacity .15s; }
+    .etl-seg:hover { opacity:.7; }
   </style>
 </head>
 <body>
+
 <header>
   <div class="logo">Face<span>Read</span></div>
   <div class="status-badge">
@@ -91,191 +136,179 @@
   </div>
 </header>
 
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="live">▶ Live Camera</button>
+  <button class="tab-btn" data-tab="photo">🖼 Photo</button>
+  <button class="tab-btn" data-tab="video">🎬 Video</button>
+</nav>
+
 <main>
-  <div class="video-section">
-    <div class="section-label">// Live Feed</div>
-    <div class="canvas-wrapper" id="canvasWrapper">
-      <video id="videoEl" autoplay muted playsinline></video>
-      <canvas id="overlayCanvas"></canvas>
-      <div class="scan-line"></div>
-      <div id="placeholder">
-        <div class="icon">📷</div>
-        <p>Click Start Detection</p>
+
+  <!-- ══ LIVE ══ -->
+  <div class="tab-pane two-col active" id="tab-live">
+    <div class="video-section">
+      <div class="section-label">// Live Feed</div>
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <video id="videoEl" autoplay muted playsinline></video>
+        <canvas id="overlayCanvas"></canvas>
+        <div class="scan-line"></div>
+        <div id="placeholder">
+          <div class="icon">📷</div>
+          <p>Click Start Detection</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn-accent" id="startBtn">▶ Start Detection</button>
       </div>
     </div>
-    <div class="controls">
-      <button id="startBtn">▶ Start Detection</button>
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">// Stats</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="stat-value" id="statFaces">0</div><div class="stat-label">Faces</div></div>
+          <div class="stat"><div class="stat-value" id="statFPS">—</div><div class="stat-label">FPS</div></div>
+          <div class="stat"><div class="stat-value" id="statFrames">0</div><div class="stat-label">Frames</div></div>
+          <div class="stat"><div class="stat-value" id="statLatency">—</div><div class="stat-label">ms RTT</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">// Detections</div>
+        <div class="face-list" id="liveFaceList"><div class="no-faces">No faces detected</div></div>
+      </div>
     </div>
   </div>
 
-  <div class="sidebar">
-    <div class="panel">
-      <div class="panel-title">// Stats</div>
-      <div class="stat-grid">
-        <div class="stat"><div class="stat-value" id="statFaces">0</div><div class="stat-label">Faces</div></div>
-        <div class="stat"><div class="stat-value" id="statFPS">—</div><div class="stat-label">FPS</div></div>
-        <div class="stat"><div class="stat-value" id="statFrames">0</div><div class="stat-label">Frames</div></div>
-        <div class="stat"><div class="stat-value" id="statLatency">—</div><div class="stat-label">ms RTT</div></div>
+  <!-- ══ PHOTO ══ -->
+  <div class="tab-pane two-col" id="tab-photo">
+    <div class="video-section">
+      <div class="section-label">// Photo Analysis</div>
+      <div class="upload-zone" id="photoZone">
+        <div class="uz-icon">🖼</div>
+        <div class="uz-text">Drop an image here<br>or click to browse</div>
+        <div class="uz-sub">JPG · PNG · WEBP · GIF</div>
+        <input type="file" id="photoInput" accept="image/*" />
+      </div>
+      <div class="result-wrap" id="photoResult">
+        <canvas id="photoBase" class="base-layer"></canvas>
+        <canvas id="photoOv"   class="overlay-layer"></canvas>
+        <div class="proc-overlay hidden" id="photoProc">
+          <div class="spinner"></div>
+          <div class="proc-text">Analyzing…</div>
+        </div>
+      </div>
+      <div class="controls" id="photoCtrl" style="display:none">
+        <button class="btn-accent" id="photoRerun">↺ Re-analyze</button>
+        <button class="btn-muted"  id="photoClear">✕ Clear</button>
       </div>
     </div>
-
-    <div class="panel">
-      <div class="panel-title">// Server</div>
-      <span class="config-label">WebSocket URL</span>
-      <input id="wsUrl" type="text" value="wss://deepface-wao8.onrender.com/ws" />
-    </div>
-
-    <div class="panel">
-      <div class="panel-title">// Detections</div>
-      <div id="faceList"><div class="no-faces">No faces detected</div></div>
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">// Detections</div>
+        <div class="face-list" id="photoFaceList"><div class="no-faces">Upload a photo to begin</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">// Server</div>
+        <span class="config-label">API Base URL</span>
+        <input class="url-input" id="apiUrl" type="text" />
+      </div>
     </div>
   </div>
+
+  <!-- ══ VIDEO ══ -->
+  <div class="tab-pane two-col" id="tab-video">
+    <div class="video-section">
+      <div class="section-label">// Video Analysis</div>
+      <div class="upload-zone" id="videoZone">
+        <div class="uz-icon">🎬</div>
+        <div class="uz-text">Drop a video here<br>or click to browse</div>
+        <div class="uz-sub">MP4 · WEBM · MOV · AVI</div>
+        <input type="file" id="videoInput" accept="video/*" />
+      </div>
+      <div class="result-wrap" id="videoResult">
+        <video id="uploadedVideo" class="base-layer" muted playsinline></video>
+        <canvas id="videoOv" class="overlay-layer"></canvas>
+        <div class="proc-overlay hidden" id="videoProc">
+          <div class="spinner"></div>
+          <div class="proc-text" id="vpText">Preparing…</div>
+          <div class="prog-wrap">
+            <div class="prog-track"><div class="prog-fill" id="vpBar" style="width:0%"></div></div>
+            <div class="prog-pct" id="vpPct">0%</div>
+          </div>
+        </div>
+      </div>
+      <div class="timeline-panel" id="tlPanel" style="display:none">
+        <div class="timeline-header">
+          <span class="tl-label">// Emotion Timeline</span>
+          <span class="tl-info" id="tlInfo">— frames</span>
+        </div>
+        <input type="range" id="timelineScrubber" min="0" value="0" step="1" />
+        <div class="emotion-tl" id="emotionTL"></div>
+      </div>
+      <div class="controls" id="videoCtrl" style="display:none">
+        <button class="btn-accent" id="videoAnalyze">⚡ Analyze Video</button>
+        <button class="btn-muted"  id="videoClear">✕ Clear</button>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">// Frame Detections</div>
+        <div class="face-list" id="videoFaceList"><div class="no-faces">Upload a video to begin</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">// Stats</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="stat-value" id="vFrames">—</div><div class="stat-label">Frames</div></div>
+          <div class="stat"><div class="stat-value" id="vPeak">—</div><div class="stat-label">Peak Faces</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <script>
-const videoEl       = document.getElementById('videoEl');
-const overlayCanvas = document.getElementById('overlayCanvas');
-const ctx           = overlayCanvas.getContext('2d');
-const canvasWrapper = document.getElementById('canvasWrapper');
-const placeholder   = document.getElementById('placeholder');
-const statusDot     = document.getElementById('statusDot');
-const statusText    = document.getElementById('statusText');
-const faceList      = document.getElementById('faceList');
-const statFaces     = document.getElementById('statFaces');
-const statFPS       = document.getElementById('statFPS');
-const statFrames    = document.getElementById('statFrames');
-const statLatency   = document.getElementById('statLatency');
-const wsUrlInput    = document.getElementById('wsUrl');
+// ══════════════════════════════════════
+//  URL AUTO-DETECTION
+//  Works for localhost, Render, and HuggingFace Spaces
+// ══════════════════════════════════════
+const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const WS_URL  = isLocal ? 'ws://127.0.0.1:8000/ws'
+                        : 'wss://' + location.host + '/ws';
+const API_URL = isLocal ? 'http://127.0.0.1:8000'
+                        : 'https://' + location.host;
 
-const EMOTION_COLORS = {
-  happy:'#00e5ff', sad:'#788cff', angry:'#ff3cac',
-  fear:'#ff9900', surprise:'#ffe44d', disgust:'#00ff9d', neutral:'#8899aa'
-};
+// Pre-fill the API URL input
+document.getElementById('apiUrl').value = API_URL;
 
-// ---- State ----
-let ws = null, stream = null, running = false;
-let frameCount = 0, fpsFrames = 0, fpsTimer = null, sendTs = 0;
-let lastFaces = [];
-let animFrameId = null;
-
-// Capture canvas (offscreen, no flicker)
-const capCanvas = document.createElement('canvas');
-const capCtx    = capCanvas.getContext('2d');
-
-const SEND_EVERY = 3;
-
-// ---- Frontend emotion smoother ----
-const frontHistory = {};
-const FRONT_N = 5;
-function frontSmooth(idx, emotion) {
-  if (!frontHistory[idx]) frontHistory[idx] = [];
-  frontHistory[idx].push(emotion);
-  if (frontHistory[idx].length > FRONT_N) frontHistory[idx].shift();
-  const freq = {};
-  frontHistory[idx].forEach(e => freq[e] = (freq[e]||0)+1);
-  const total = frontHistory[idx].length;
-  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
-  return (sorted[0][1] / total >= 0.7) ? sorted[0][0] : (frontHistory[idx][frontHistory[idx].length-1]);
-}
+// ══════════════════════════════════════
+//  SHARED
+// ══════════════════════════════════════
+const ECOL = { happy:'#00e5ff', sad:'#788cff', angry:'#ff3cac', fear:'#ff9900', surprise:'#ffe44d', disgust:'#00ff9d', neutral:'#8899aa' };
 
 function setStatus(cls, txt) {
-  statusDot.className = 'status-dot ' + cls;
-  statusText.textContent = txt;
+  document.getElementById('statusDot').className = 'status-dot ' + cls;
+  document.getElementById('statusText').textContent = txt;
 }
 
-// ---- Start ----
-async function start() {
-  if (running) return;
-
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480 }, audio:false });
-    videoEl.srcObject = stream;
-    await videoEl.play();
-  } catch(e) {
-    setStatus('error', 'Camera Error'); return;
-  }
-
-  placeholder.style.display = 'none';
-  canvasWrapper.classList.add('live');
-  setStatus('', 'Connecting...');
-
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const wsUrl = isLocal ? 'ws://127.0.0.1:8000/ws' : 'wss://deepface-wao8.onrender.com/ws';
-  ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {
-    running = true;
-    frameCount = 0; fpsFrames = 0;
-    fpsTimer = setInterval(() => { statFPS.textContent = fpsFrames; fpsFrames = 0; }, 1000);
-    setStatus('live', 'Live');
-    document.getElementById('startBtn').textContent = '■ Stop';
-    document.getElementById('startBtn').classList.add('running');
-    animFrameId = requestAnimationFrame(renderLoop);
-  };
-
-  ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    const raw = data.faces || [];
-
-    lastFaces = raw.map((face, i) => ({
-      ...face,
-      emotion: frontSmooth(i, face.emotion)
-    }));
-
-    statFaces.textContent = lastFaces.length;
-    statLatency.textContent = Date.now() - sendTs;
-    renderCards(lastFaces);
-  };
-
-  ws.onerror = () => setStatus('error', 'Connection Error');
-  ws.onclose = () => { if (running) stop(); };
+function getApiBase() {
+  return (document.getElementById('apiUrl').value || API_URL).trim().replace(/\/$/, '');
 }
 
-// ---- Render loop ----
-function renderLoop() {
-  if (!running) return;
-
-  const vw = videoEl.videoWidth  || 640;
-  const vh = videoEl.videoHeight || 480;
-  if (overlayCanvas.width !== vw)  { overlayCanvas.width  = vw; capCanvas.width  = vw; }
-  if (overlayCanvas.height !== vh) { overlayCanvas.height = vh; capCanvas.height = vh; }
-
-  frameCount++;
-  fpsFrames++;
-  statFrames.textContent = frameCount;
-
-  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  drawFaces(lastFaces);
-
-  if (frameCount % SEND_EVERY === 0 && ws && ws.readyState === WebSocket.OPEN) {
-    capCtx.drawImage(videoEl, 0, 0);
-    sendTs = Date.now();
-    ws.send(JSON.stringify({ frame: capCanvas.toDataURL('image/jpeg', 0.75) }));
-  }
-
-  animFrameId = requestAnimationFrame(renderLoop);
+async function callAnalyzeImage(dataUrl) {
+  const r = await fetch(getApiBase() + '/analyze-image', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frame: dataUrl })
+  });
+  if (!r.ok) throw new Error('Server error ' + r.status);
+  return r.json();
 }
 
-// ---- Draw bounding boxes ----
-function drawFaces(faces) {
-  // capCtx.drawImage(videoEl) captures raw (unmirrored) pixels regardless of CSS.
-  // So server coords are in RAW camera space.
-  // The displayed video is CSS-mirrored. The canvas has no CSS transform.
-  // To align box with the mirrored face: flip X = cw - x*sw - w*sw.
-  // Text is drawn in normal canvas space so it reads correctly.
-  const cw = overlayCanvas.width;
-  const sw = cw / (videoEl.videoWidth  || 640);
-  const sh = overlayCanvas.height / (videoEl.videoHeight || 480);
-
+function drawBoxes(ctx, faces, cw, ch, srcW, srcH) {
+  const sw = cw / srcW, sh = ch / srcH;
   faces.forEach(face => {
     const { x, y, w, h } = face.box;
-    const color = EMOTION_COLORS[face.emotion] || '#00e5ff';
-
-    // Mirror X to match the CSS-flipped video
-    const rx = cw - (x * sw) - (w * sw);
-    const ry = y * sh;
-    const rw = w * sw;
-    const rh = h * sh;
+    const color = ECOL[face.emotion] || '#00e5ff';
+    const rx = x*sw, ry = y*sh, rw = w*sw, rh = h*sh;
 
     // Box
     ctx.strokeStyle = color; ctx.lineWidth = 2;
@@ -283,94 +316,421 @@ function drawFaces(faces) {
 
     // Corner accents
     const cs = 10; ctx.lineWidth = 3;
-    [[rx,ry,cs,cs],[rx+rw,ry,-cs,cs],[rx,ry+rh,cs,-cs],[rx+rw,ry+rh,-cs,-cs]].forEach(([cx,cy,dx,dy]) => {
+    [[rx,ry,cs,cs],[rx+rw,ry,-cs,cs],[rx,ry+rh,cs,-cs],[rx+rw,ry+rh,-cs,-cs]].forEach(([cx2,cy2,dx,dy]) => {
       ctx.beginPath(); ctx.strokeStyle = color;
-      ctx.moveTo(cx+dx, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy+dy); ctx.stroke();
+      ctx.moveTo(cx2+dx, cy2); ctx.lineTo(cx2, cy2); ctx.lineTo(cx2, cy2+dy); ctx.stroke();
     });
 
-    // Emotion label above box (normal text, no flip needed)
-    const label = face.emotion.charAt(0).toUpperCase() + face.emotion.slice(1);
+    // Emotion label above box
+    const lbl = face.emotion[0].toUpperCase() + face.emotion.slice(1);
     ctx.font = 'bold 13px monospace';
-    const tw = ctx.measureText(label).width;
-    ctx.fillStyle = color;
-    ctx.fillRect(rx - 1, ry - 24, tw + 14, 21);
-    ctx.fillStyle = '#050810';
-    ctx.fillText(label, rx + 6, ry - 9);
+    const tw = ctx.measureText(lbl).width;
+    ctx.fillStyle = color; ctx.fillRect(rx-1, ry-24, tw+14, 21);
+    ctx.fillStyle = '#050810'; ctx.fillText(lbl, rx+6, ry-9);
 
-    // Gender label below box
+    // Gender below box (no age)
     if (face.gender) {
-      const genderShort = face.gender === 'Man' ? '♂' : face.gender === 'Woman' ? '♀' : '?';
+      const gSym = face.gender === 'Man' ? '♂' : face.gender === 'Woman' ? '♀' : '';
+      const gLbl = gSym + '  ' + face.gender;
       ctx.font = 'bold 12px monospace';
-      const gw = ctx.measureText(genderShort).width;
-      ctx.fillStyle = color;
-      ctx.fillRect(rx - 1, ry + rh + 1, gw + 14, 20);
-      ctx.fillStyle = '#050810';
-      ctx.fillText(genderShort, rx + 6, ry + rh + 15);
+      const gw = ctx.measureText(gLbl).width;
+      ctx.fillStyle = color; ctx.fillRect(rx-1, ry+rh+1, gw+14, 20);
+      ctx.fillStyle = '#050810'; ctx.fillText(gLbl, rx+6, ry+rh+15);
     }
   });
 }
 
-// ---- Sidebar face cards ----
-function renderCards(faces) {
-  if (!faces.length) {
-    faceList.innerHTML = '<div class="no-faces">No faces detected</div>';
-    return;
-  }
-  faceList.innerHTML = '';
+function renderCards(el, faces) {
+  if (!faces || !faces.length) { el.innerHTML = '<div class="no-faces">No faces detected</div>'; return; }
+  el.innerHTML = '';
   faces.forEach((face, i) => {
-    const color = EMOTION_COLORS[face.emotion] || '#00e5ff';
-    const sorted = Object.entries(face.scores || {}).sort((a,b) => b[1]-a[1]);
-    const genderIcon = face.gender === 'Man' ? '♂' : face.gender === 'Woman' ? '♀' : '';
+    const color = ECOL[face.emotion] || '#00e5ff';
+    const sorted = Object.entries(face.scores || {}).sort((a, b) => b[1] - a[1]);
+    const gIcon = face.gender === 'Man' ? '♂' : face.gender === 'Woman' ? '♀' : '';
     const card = document.createElement('div');
-    card.className = 'face-card';
-    card.style.borderLeftColor = color;
+    card.className = 'face-card'; card.style.borderLeftColor = color;
     card.innerHTML = `
       <div class="face-header">
         <span class="face-id">Face #${i+1}</span>
         <span class="emotion-badge" style="background:${color}22;color:${color}">${face.emotion}</span>
       </div>
-      ${face.gender ? `
       <div style="margin-bottom:8px;">
-        <span style="font-size:0.65rem;color:var(--muted)">${genderIcon} ${face.gender}</span>
-      </div>` : ''}
-      <div class="emotion-bars">
-        ${sorted.map(([emo, val]) => `
-          <div class="ebar">
-            <span class="ebar-name">${emo}</span>
-            <div class="ebar-track">
-              <div class="ebar-fill" style="width:${Math.min(val,100)}%;background:${emo===face.emotion?color:'rgba(255,255,255,0.15)'}"></div>
-            </div>
-            <span class="ebar-val">${val.toFixed(0)}%</span>
-          </div>`).join('')}
+        <span style="font-size:0.65rem;color:var(--muted)">${gIcon} ${face.gender || '—'}</span>
+      </div>
+      <div class="emotion-bars">${sorted.map(([e,v]) => `
+        <div class="ebar">
+          <span class="ebar-name">${e}</span>
+          <div class="ebar-track"><div class="ebar-fill" style="width:${Math.min(v,100)}%;background:${e===face.emotion?color:'rgba(255,255,255,0.15)'}"></div></div>
+          <span class="ebar-val">${v.toFixed(0)}%</span>
+        </div>`).join('')}
       </div>`;
-    faceList.appendChild(card);
+    el.appendChild(card);
   });
 }
 
-// ---- Stop ----
-function stop() {
+// ══════════════════════════════════════
+//  TAB SWITCHING
+// ══════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════
+//  LIVE TAB
+// ══════════════════════════════════════
+const videoEl       = document.getElementById('videoEl');
+const overlayCanvas = document.getElementById('overlayCanvas');
+const liveCtx       = overlayCanvas.getContext('2d');
+const canvasWrapper = document.getElementById('canvasWrapper');
+const placeholder   = document.getElementById('placeholder');
+const liveFaceList  = document.getElementById('liveFaceList');
+const statFaces     = document.getElementById('statFaces');
+const statFPS       = document.getElementById('statFPS');
+const statFrames    = document.getElementById('statFrames');
+const statLatency   = document.getElementById('statLatency');
+
+let ws=null, stream=null, running=false;
+let frameCount=0, fpsFrames=0, fpsTimer=null, sendTs=0, lastFaces=[], animId=null;
+const capC = document.createElement('canvas');
+const capCtx = capC.getContext('2d');
+const SEND_EVERY = 3;
+
+// Frontend smoother — larger window, lower threshold = less snapping
+const hist = {};
+const FRONT_N = 8;
+const FRONT_THRESH = 0.5;
+
+function smooth(i, e) {
+  if (!hist[i]) hist[i] = [];
+  hist[i].push(e);
+  if (hist[i].length > FRONT_N) hist[i].shift();
+  const f = {};
+  hist[i].forEach(x => f[x] = (f[x]||0) + 1);
+  const sorted = Object.entries(f).sort((a,b) => b[1]-a[1]);
+  const topRatio = sorted[0][1] / hist[i].length;
+  // Only switch if dominant emotion clears threshold, else hold previous
+  return topRatio >= FRONT_THRESH ? sorted[0][0] : (hist[i][hist[i].length-2] || e);
+}
+
+async function startLive() {
+  if (running) return;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480 }, audio:false });
+    videoEl.srcObject = stream; await videoEl.play();
+  } catch(e) { setStatus('error', 'Camera Error'); return; }
+
+  placeholder.style.display = 'none';
+  canvasWrapper.classList.add('live');
+  setStatus('', 'Connecting…');
+
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    running = true; frameCount = 0; fpsFrames = 0;
+    fpsTimer = setInterval(() => { statFPS.textContent = fpsFrames; fpsFrames = 0; }, 1000);
+    setStatus('live', 'Live');
+    const btn = document.getElementById('startBtn');
+    btn.textContent = '■ Stop'; btn.classList.add('running');
+    animId = requestAnimationFrame(liveLoop);
+  };
+
+  ws.onmessage = e => {
+    const raw = JSON.parse(e.data).faces || [];
+    lastFaces = raw.map((f, i) => ({ ...f, emotion: smooth(i, f.emotion) }));
+    statFaces.textContent = lastFaces.length;
+    statLatency.textContent = Date.now() - sendTs;
+    renderCards(liveFaceList, lastFaces);
+  };
+
+  ws.onerror = () => setStatus('error', 'Connection Error');
+  ws.onclose = () => { if (running) stopLive(); };
+}
+
+function liveLoop() {
+  if (!running) return;
+  const vw = videoEl.videoWidth || 640, vh = videoEl.videoHeight || 480;
+  if (overlayCanvas.width  !== vw) { overlayCanvas.width  = vw; capC.width  = vw; }
+  if (overlayCanvas.height !== vh) { overlayCanvas.height = vh; capC.height = vh; }
+  frameCount++; fpsFrames++; statFrames.textContent = frameCount;
+  liveCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+  // Mirror X — video is CSS-flipped, boxes need to match
+  const cw = overlayCanvas.width;
+  const sw = cw / (videoEl.videoWidth || 640);
+  const sh = overlayCanvas.height / (videoEl.videoHeight || 480);
+
+  lastFaces.forEach(face => {
+    const { x, y, w, h } = face.box;
+    const color = ECOL[face.emotion] || '#00e5ff';
+    const rx = cw - (x*sw) - (w*sw), ry = y*sh, rw = w*sw, rh = h*sh;
+
+    liveCtx.strokeStyle = color; liveCtx.lineWidth = 2;
+    liveCtx.strokeRect(rx, ry, rw, rh);
+    const cs = 10; liveCtx.lineWidth = 3;
+    [[rx,ry,cs,cs],[rx+rw,ry,-cs,cs],[rx,ry+rh,cs,-cs],[rx+rw,ry+rh,-cs,-cs]].forEach(([cx2,cy2,dx,dy]) => {
+      liveCtx.beginPath(); liveCtx.strokeStyle = color;
+      liveCtx.moveTo(cx2+dx, cy2); liveCtx.lineTo(cx2, cy2); liveCtx.lineTo(cx2, cy2+dy); liveCtx.stroke();
+    });
+
+    const lbl = face.emotion[0].toUpperCase() + face.emotion.slice(1);
+    liveCtx.font = 'bold 13px monospace';
+    const tw = liveCtx.measureText(lbl).width;
+    liveCtx.fillStyle = color; liveCtx.fillRect(rx-1, ry-24, tw+14, 21);
+    liveCtx.fillStyle = '#050810'; liveCtx.fillText(lbl, rx+6, ry-9);
+
+    if (face.gender) {
+      const gSym = face.gender === 'Man' ? '♂' : face.gender === 'Woman' ? '♀' : '';
+      const gLbl = gSym + '  ' + face.gender;
+      liveCtx.font = 'bold 12px monospace';
+      const gw = liveCtx.measureText(gLbl).width;
+      liveCtx.fillStyle = color; liveCtx.fillRect(rx-1, ry+rh+1, gw+14, 20);
+      liveCtx.fillStyle = '#050810'; liveCtx.fillText(gLbl, rx+6, ry+rh+15);
+    }
+  });
+
+  if (frameCount % SEND_EVERY === 0 && ws && ws.readyState === WebSocket.OPEN) {
+    capCtx.drawImage(videoEl, 0, 0); sendTs = Date.now();
+    ws.send(JSON.stringify({ frame: capC.toDataURL('image/jpeg', 0.92) }));
+  }
+  animId = requestAnimationFrame(liveLoop);
+}
+
+function stopLive() {
   running = false;
-  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
   clearInterval(fpsTimer);
   if (ws)     { ws.close(); ws = null; }
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   videoEl.srcObject = null;
-  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  liveCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
   canvasWrapper.classList.remove('live');
-  placeholder.style.display = 'flex';
-  lastFaces = [];
-  Object.keys(frontHistory).forEach(k => delete frontHistory[k]);
+  placeholder.style.display = 'flex'; lastFaces = [];
+  Object.keys(hist).forEach(k => delete hist[k]);
   setStatus('', 'Idle');
   const btn = document.getElementById('startBtn');
-  btn.textContent = '▶ Start Detection';
-  btn.classList.remove('running');
+  btn.textContent = '▶ Start Detection'; btn.classList.remove('running');
   statFaces.textContent = '0'; statFPS.textContent = '—'; statLatency.textContent = '—';
-  faceList.innerHTML = '<div class="no-faces">No faces detected</div>';
+  renderCards(liveFaceList, []);
 }
 
 document.getElementById('startBtn').addEventListener('click', () => {
-  if (running) stop(); else start();
+  if (running) stopLive(); else startLive();
 });
+
+// ══════════════════════════════════════
+//  PHOTO TAB
+// ══════════════════════════════════════
+const photoZone    = document.getElementById('photoZone');
+const photoInput   = document.getElementById('photoInput');
+const photoResult  = document.getElementById('photoResult');
+const photoBase    = document.getElementById('photoBase');
+const photoOv      = document.getElementById('photoOv');
+const photoProc    = document.getElementById('photoProc');
+const photoCtrl    = document.getElementById('photoCtrl');
+const photoFaceList= document.getElementById('photoFaceList');
+const pbCtx = photoBase.getContext('2d'), poCtx = photoOv.getContext('2d');
+let photoDataUrl = null;
+
+function setupDrop(zone, input, onFile) {
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    const f = e.dataTransfer.files[0]; if (f) onFile(f);
+  });
+  input.addEventListener('change', () => { if (input.files[0]) onFile(input.files[0]); });
+}
+
+setupDrop(photoZone, photoInput, loadPhoto);
+
+function loadPhoto(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    photoDataUrl = e.target.result;
+    const img = new Image();
+    img.onload = () => {
+      photoBase.width  = img.naturalWidth;  photoBase.height  = img.naturalHeight;
+      photoOv.width    = img.naturalWidth;  photoOv.height    = img.naturalHeight;
+      pbCtx.drawImage(img, 0, 0);
+      poCtx.clearRect(0, 0, photoOv.width, photoOv.height);
+      photoZone.style.display   = 'none';
+      photoResult.style.display = 'block';
+      photoCtrl.style.display   = 'flex';
+      runPhoto();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runPhoto() {
+  if (!photoDataUrl) return;
+  photoProc.classList.remove('hidden');
+  setStatus('', 'Analyzing…');
+  poCtx.clearRect(0, 0, photoOv.width, photoOv.height);
+  renderCards(photoFaceList, []);
+  try {
+    const data = await callAnalyzeImage(photoDataUrl);
+    const faces = data.faces || [];
+    drawBoxes(poCtx, faces, photoOv.width, photoOv.height, photoBase.width, photoBase.height);
+    renderCards(photoFaceList, faces);
+    setStatus('', faces.length ? `${faces.length} face${faces.length > 1 ? 's' : ''} found` : 'No faces found');
+  } catch(err) {
+    setStatus('error', 'Analysis Failed');
+    photoFaceList.innerHTML = `<div class="no-faces" style="color:var(--accent2)">${err.message}</div>`;
+  } finally {
+    photoProc.classList.add('hidden');
+  }
+}
+
+document.getElementById('photoRerun').addEventListener('click', runPhoto);
+document.getElementById('photoClear').addEventListener('click', () => {
+  photoDataUrl = null; photoInput.value = '';
+  photoZone.style.display   = 'flex';
+  photoResult.style.display = 'none';
+  photoCtrl.style.display   = 'none';
+  photoFaceList.innerHTML = '<div class="no-faces">Upload a photo to begin</div>';
+  setStatus('', 'Idle');
+});
+
+// ══════════════════════════════════════
+//  VIDEO TAB
+// ══════════════════════════════════════
+const videoZone     = document.getElementById('videoZone');
+const videoInput    = document.getElementById('videoInput');
+const videoResult   = document.getElementById('videoResult');
+const uploadedVideo = document.getElementById('uploadedVideo');
+const videoOv       = document.getElementById('videoOv');
+const videoProc     = document.getElementById('videoProc');
+const vpText        = document.getElementById('vpText');
+const vpBar         = document.getElementById('vpBar');
+const vpPct         = document.getElementById('vpPct');
+const videoCtrl     = document.getElementById('videoCtrl');
+const tlPanel       = document.getElementById('tlPanel');
+const tlInfo        = document.getElementById('tlInfo');
+const tlScrubber    = document.getElementById('timelineScrubber');
+const emotionTL     = document.getElementById('emotionTL');
+const videoFaceList = document.getElementById('videoFaceList');
+const voCtx         = videoOv.getContext('2d');
+const VSAMPLE_FPS   = 2;
+
+let vResults = [], vAnalyzing = false;
+
+setupDrop(videoZone, videoInput, loadVideoFile);
+
+function loadVideoFile(file) {
+  const url = URL.createObjectURL(file);
+  uploadedVideo.src = url;
+  uploadedVideo.onloadedmetadata = () => {
+    videoZone.style.display   = 'none';
+    videoResult.style.display = 'block';
+    videoCtrl.style.display   = 'flex';
+    tlPanel.style.display     = 'none';
+    videoOv.width  = uploadedVideo.videoWidth  || 640;
+    videoOv.height = uploadedVideo.videoHeight || 480;
+    voCtx.clearRect(0, 0, videoOv.width, videoOv.height);
+    vResults = [];
+    videoFaceList.innerHTML = '<div class="no-faces">Click Analyze to detect emotions</div>';
+    document.getElementById('vFrames').textContent = '—';
+    document.getElementById('vPeak').textContent   = '—';
+  };
+}
+
+document.getElementById('videoAnalyze').addEventListener('click', () => {
+  if (!uploadedVideo.src || vAnalyzing) return;
+  analyzeVideo();
+});
+
+document.getElementById('videoClear').addEventListener('click', () => {
+  videoZone.style.display   = 'flex';
+  videoResult.style.display = 'none';
+  videoCtrl.style.display   = 'none';
+  tlPanel.style.display     = 'none';
+  videoInput.value = ''; uploadedVideo.src = '';
+  vResults = [];
+  videoFaceList.innerHTML = '<div class="no-faces">Upload a video to begin</div>';
+  document.getElementById('vFrames').textContent = '—';
+  document.getElementById('vPeak').textContent   = '—';
+  setStatus('', 'Idle');
+});
+
+async function analyzeVideo() {
+  vAnalyzing = true; vResults = [];
+  videoProc.classList.remove('hidden');
+  setStatus('', 'Analyzing video…');
+  document.getElementById('videoAnalyze').disabled = true;
+
+  const duration = uploadedVideo.duration;
+  const step = 1 / VSAMPLE_FPS;
+  const times = [];
+  for (let t = 0; t < duration; t += step) times.push(parseFloat(t.toFixed(3)));
+
+  const fc = document.createElement('canvas');
+  fc.width  = uploadedVideo.videoWidth  || 640;
+  fc.height = uploadedVideo.videoHeight || 480;
+  const fctx = fc.getContext('2d');
+
+  for (let i = 0; i < times.length; i++) {
+    const pct = Math.round(i / times.length * 100);
+    vpText.textContent   = `Frame ${i+1} / ${times.length}`;
+    vpBar.style.width    = pct + '%';
+    vpPct.textContent    = pct + '%';
+    await seekTo(uploadedVideo, times[i]);
+    fctx.drawImage(uploadedVideo, 0, 0, fc.width, fc.height);
+    let faces = [];
+    try { const d = await callAnalyzeImage(fc.toDataURL('image/jpeg', 0.7)); faces = d.faces || []; }
+    catch(e) { /* skip */ }
+    vResults.push({ time: times[i], faces });
+  }
+
+  vAnalyzing = false;
+  videoProc.classList.add('hidden');
+  document.getElementById('videoAnalyze').disabled = false;
+
+  const peak = Math.max(...vResults.map(r => r.faces.length), 0);
+  document.getElementById('vFrames').textContent = vResults.length;
+  document.getElementById('vPeak').textContent   = peak;
+  tlScrubber.max   = vResults.length - 1;
+  tlScrubber.value = 0;
+  buildTimeline();
+  tlPanel.style.display = 'block';
+  showFrame(0);
+  setStatus('', `Done — ${vResults.length} frames analyzed`);
+}
+
+function seekTo(vid, t) {
+  return new Promise(res => { vid.currentTime = t; vid.onseeked = () => res(); });
+}
+
+function buildTimeline() {
+  emotionTL.innerHTML = '';
+  tlInfo.textContent  = `${vResults.length} frames`;
+  vResults.forEach((r, i) => {
+    const seg = document.createElement('div');
+    seg.className = 'etl-seg';
+    const e = r.faces[0]?.emotion || null;
+    seg.style.background = e ? (ECOL[e] || '#333') : 'rgba(255,255,255,0.05)';
+    seg.title = `${r.time.toFixed(1)}s — ${e || 'no face'}`;
+    seg.addEventListener('click', () => { tlScrubber.value = i; showFrame(i); });
+    emotionTL.appendChild(seg);
+  });
+}
+
+function showFrame(idx) {
+  const r = vResults[idx]; if (!r) return;
+  uploadedVideo.currentTime = r.time;
+  voCtx.clearRect(0, 0, videoOv.width, videoOv.height);
+  drawBoxes(voCtx, r.faces, videoOv.width, videoOv.height, uploadedVideo.videoWidth||640, uploadedVideo.videoHeight||480);
+  renderCards(videoFaceList, r.faces);
+  tlInfo.textContent = `Frame ${idx+1} / ${vResults.length}  (${r.time.toFixed(2)}s)`;
+}
+
+tlScrubber.addEventListener('input', () => showFrame(parseInt(tlScrubber.value)));
 </script>
 </body>
 </html>
