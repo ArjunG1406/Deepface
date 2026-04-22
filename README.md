@@ -2,7 +2,7 @@
 title: DeepFace Emotion Detection
 emoji: 😊
 colorFrom: blue
-colorTo: cyan
+colorTo: indigo
 sdk: docker
 pinned: false
 ---
