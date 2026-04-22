@@ -38,7 +38,7 @@
     .canvas-wrapper::after  { bottom:10px; right:10px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); }
 
     #videoEl { width:100%; height:100%; object-fit:cover; display:block; transform:scaleX(-1); }
-    #overlayCanvas { position:absolute; inset:0; width:100%; height:100%; transform:scaleX(-1); pointer-events:none; }
+    #overlayCanvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
     .scan-line { position:absolute; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:0; pointer-events:none; z-index:6; }
     .canvas-wrapper.live .scan-line { opacity:.4; animation:scan 3s linear infinite; }
@@ -155,17 +155,16 @@ const EMOTION_COLORS = {
 // ---- State ----
 let ws = null, stream = null, running = false;
 let frameCount = 0, fpsFrames = 0, fpsTimer = null, sendTs = 0;
-let lastFaces = [];        // latest faces from server — updated on every WS message
+let lastFaces = [];
 let animFrameId = null;
 
 // Capture canvas (offscreen, no flicker)
 const capCanvas = document.createElement('canvas');
 const capCtx    = capCanvas.getContext('2d');
 
-// Send every Nth animation frame to server
 const SEND_EVERY = 3;
 
-// ---- Frontend emotion smoother (mode of last N) ----
+// ---- Frontend emotion smoother ----
 const frontHistory = {};
 const FRONT_N = 5;
 function frontSmooth(idx, emotion) {
@@ -174,7 +173,9 @@ function frontSmooth(idx, emotion) {
   if (frontHistory[idx].length > FRONT_N) frontHistory[idx].shift();
   const freq = {};
   frontHistory[idx].forEach(e => freq[e] = (freq[e]||0)+1);
-  const total = frontHistory[idx].length; const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]); return (sorted[0][1] / total >= 0.7) ? sorted[0][0] : (frontHistory[idx][frontHistory[idx].length-1]);
+  const total = frontHistory[idx].length;
+  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+  return (sorted[0][1] / total >= 0.7) ? sorted[0][0] : (frontHistory[idx][frontHistory[idx].length-1]);
 }
 
 function setStatus(cls, txt) {
@@ -216,7 +217,6 @@ async function start() {
     const data = JSON.parse(e.data);
     const raw = data.faces || [];
 
-    // Apply frontend smoothing on top of backend smoothing
     lastFaces = raw.map((face, i) => ({
       ...face,
       emotion: frontSmooth(i, face.emotion)
@@ -231,11 +231,10 @@ async function start() {
   ws.onclose = () => { if (running) stop(); };
 }
 
-// ---- Render loop — runs every animation frame (~60fps) ----
+// ---- Render loop ----
 function renderLoop() {
   if (!running) return;
 
-  // Keep canvas in sync with actual video dimensions
   const vw = videoEl.videoWidth  || 640;
   const vh = videoEl.videoHeight || 480;
   if (overlayCanvas.width !== vw)  { overlayCanvas.width  = vw; capCanvas.width  = vw; }
@@ -245,11 +244,9 @@ function renderLoop() {
   fpsFrames++;
   statFrames.textContent = frameCount;
 
-  // Always redraw boxes every frame for smooth overlay
   ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
   drawFaces(lastFaces);
 
-  // Send frame to server every SEND_EVERY frames
   if (frameCount % SEND_EVERY === 0 && ws && ws.readyState === WebSocket.OPEN) {
     capCtx.drawImage(videoEl, 0, 0);
     sendTs = Date.now();
@@ -261,18 +258,26 @@ function renderLoop() {
 
 // ---- Draw bounding boxes ----
 function drawFaces(faces) {
-  const sw = overlayCanvas.width  / (videoEl.videoWidth  || 640);
+  // capCtx.drawImage(videoEl) captures raw (unmirrored) pixels regardless of CSS.
+  // So server coords are in RAW camera space.
+  // The displayed video is CSS-mirrored. The canvas has no CSS transform.
+  // To align box with the mirrored face: flip X = cw - x*sw - w*sw.
+  // Text is drawn in normal canvas space so it reads correctly.
+  const cw = overlayCanvas.width;
+  const sw = cw / (videoEl.videoWidth  || 640);
   const sh = overlayCanvas.height / (videoEl.videoHeight || 480);
 
   faces.forEach(face => {
     const { x, y, w, h } = face.box;
     const color = EMOTION_COLORS[face.emotion] || '#00e5ff';
-    // Mirror x because canvas is CSS-flipped (transform: scaleX(-1))
-    const rw = w*sw, rh = h*sh;
-    const rx = overlayCanvas.width - (x*sw) - rw;
-    const ry = y*sh;
 
-    // Main rectangle
+    // Mirror X to match the CSS-flipped video
+    const rx = cw - (x * sw) - (w * sw);
+    const ry = y * sh;
+    const rw = w * sw;
+    const rh = h * sh;
+
+    // Box
     ctx.strokeStyle = color; ctx.lineWidth = 2;
     ctx.strokeRect(rx, ry, rw, rh);
 
@@ -283,25 +288,24 @@ function drawFaces(faces) {
       ctx.moveTo(cx+dx, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy+dy); ctx.stroke();
     });
 
-    // Emotion label above box
+    // Emotion label above box (normal text, no flip needed)
     const label = face.emotion.charAt(0).toUpperCase() + face.emotion.slice(1);
     ctx.font = 'bold 13px monospace';
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = color;
-    ctx.fillRect(rx-1, ry-24, tw+14, 21);
+    ctx.fillRect(rx - 1, ry - 24, tw + 14, 21);
     ctx.fillStyle = '#050810';
-    ctx.fillText(label, rx+6, ry-9);
+    ctx.fillText(label, rx + 6, ry - 9);
 
-    // Age + gender label below box
-    if (face.age || face.gender) {
+    // Gender label below box
+    if (face.gender) {
       const genderShort = face.gender === 'Man' ? '♂' : face.gender === 'Woman' ? '♀' : '?';
-      const infoLabel = genderShort + '  ' + (face.age || '?') + 'yrs';
       ctx.font = 'bold 12px monospace';
-      const iw = ctx.measureText(infoLabel).width;
+      const gw = ctx.measureText(genderShort).width;
       ctx.fillStyle = color;
-      ctx.fillRect(rx-1, ry+rh+1, iw+14, 20);
+      ctx.fillRect(rx - 1, ry + rh + 1, gw + 14, 20);
       ctx.fillStyle = '#050810';
-      ctx.fillText(infoLabel, rx+6, ry+rh+15);
+      ctx.fillText(genderShort, rx + 6, ry + rh + 15);
     }
   });
 }
@@ -325,14 +329,10 @@ function renderCards(faces) {
         <span class="face-id">Face #${i+1}</span>
         <span class="emotion-badge" style="background:${color}22;color:${color}">${face.emotion}</span>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <span style="font-size:0.65rem;color:var(--muted)">
-          ${genderIcon} ${face.gender || '—'}
-        </span>
-        <span style="font-size:0.65rem;color:var(--muted)">
-          Age: <span style="color:var(--accent)">${face.age || '—'}</span>
-        </span>
-      </div>
+      ${face.gender ? `
+      <div style="margin-bottom:8px;">
+        <span style="font-size:0.65rem;color:var(--muted)">${genderIcon} ${face.gender}</span>
+      </div>` : ''}
       <div class="emotion-bars">
         ${sorted.map(([emo, val]) => `
           <div class="ebar">
