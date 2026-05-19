@@ -23,10 +23,10 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
 
 
 # ---------- CONFIG ----------
-DETECTOR_BACKEND = "ssd"
+DETECTOR_BACKEND = "opencv"
 MIN_FACE_SIZE    = 30
 SMOOTH_N         = 5
-TARGET_DELAY     = 0.08   # ~12 FPS analysis
+TARGET_DELAY     = 0.08
 
 
 # ---------- HELPERS ----------
@@ -49,7 +49,6 @@ def to_python(obj):
 
 
 def decode_and_enhance(data_url):
-    """Decode base64 frame and apply CLAHE enhancement."""
     _, encoded = data_url.split(",", 1)
     arr = np.frombuffer(base64.b64decode(encoded), np.uint8)
     frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -62,8 +61,31 @@ def decode_and_enhance(data_url):
     return cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2BGR)
 
 
+def parse_gender(p):
+    # ---- DEBUG: log the raw gender fields so we can see what DeepFace returns ----
+    logger.info(f"RAW gender field     : {p.get('gender')}")
+    logger.info(f"RAW dominant_gender  : {p.get('dominant_gender')}")
+    # ---------------------------------------------------------------------------
+
+    gender_scores = p.get("gender", {})
+
+    if isinstance(gender_scores, dict) and gender_scores:
+        # Normalise keys — DeepFace sometimes uses "Man"/"Woman", sometimes "man"/"woman"
+        scores = {k.lower(): float(v) for k, v in gender_scores.items()}
+        man_score   = scores.get("man",   0.0)
+        woman_score = scores.get("woman", 0.0)
+        logger.info(f"Parsed → man={man_score:.1f}  woman={woman_score:.1f}")
+        return "Woman" if woman_score > man_score else "Man"
+
+    # Fallback: trust dominant_gender string
+    dg = p.get("dominant_gender", "")
+    if isinstance(dg, str) and dg:
+        return dg
+
+    return ""
+
+
 def run_deepface(frame):
-    """Run DeepFace — emotion + gender only."""
     try:
         results = DeepFace.analyze(
             frame,
@@ -83,7 +105,7 @@ def run_deepface(frame):
                                 "w": int(r["w"]), "h": int(r["h"])},
                     "emotion": str(p["dominant_emotion"]),
                     "scores":  {k: float(v) for k, v in p.get("emotion", {}).items()},
-                    "gender":  str(p.get("dominant_gender", p.get("gender", ""))),
+                    "gender":  parse_gender(p),
                 })
         return faces
     except Exception as e:
@@ -91,7 +113,7 @@ def run_deepface(frame):
         return []
 
 
-# ---------- ANALYSIS WORKER (mirrors FaceDetectionApp.py dual-thread design) ----------
+# ---------- ANALYSIS WORKER ----------
 
 class AnalysisWorker:
     def __init__(self):
@@ -145,7 +167,7 @@ class AnalysisWorker:
                 self.current_faces = valid
 
 
-# ---------- WEBSOCKET (live camera) ----------
+# ---------- WEBSOCKET ----------
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
@@ -176,14 +198,13 @@ async def ws_endpoint(websocket: WebSocket):
         worker.stop()
 
 
-# ---------- HTTP ENDPOINT (photo + video tabs) ----------
+# ---------- HTTP ENDPOINT ----------
 
 class ImageRequest(BaseModel):
-    frame: str  # base64 data URL
+    frame: str
 
 @app.post("/analyze-image")
 async def analyze_image(req: ImageRequest):
-    """Single-shot analysis for photo and video frame tabs."""
     loop = asyncio.get_event_loop()
     frame = decode_and_enhance(req.frame)
     if frame is None:
